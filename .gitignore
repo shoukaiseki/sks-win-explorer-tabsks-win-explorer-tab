@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 打包产物（build.bat 输出目录）
+# 忽略目录内容但保留占位文件，保证 clone 后目录存在
+target/*
+!target/.gitkeep
+dist/
+build/
+*.spec
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+
