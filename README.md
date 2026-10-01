@@ -49,23 +49,34 @@ OneTab 风格列表，每组支持：
 - `路径…`：选择 ETU 可执行文件位置，写入 `config.json`
 - `启动 ETU`：直接拉起 ETU
 
+**关闭行为 / 系统托盘**
+
+- 顶部 `关闭时最小化到托盘` 勾选框：
+  - 勾选：点窗口关闭按钮只隐藏窗口，托盘区保留图标，程序继续在后台运行
+  - 取消：点关闭按钮直接退出程序
+- 托盘图标左键（或双击）触发 `显示主界面`，右键菜单有 `显示主界面` / `退出`
+- 该设置持久化到 `config.json` 的 `close_action`（`tray` / `exit`）
+- 未安装 `pystray` / `pillow` 时会弹提示并回退为直接关闭
+
 界面默认最大化启动，`F5` 刷新窗口列表。
 
 ## 环境要求
 
 - Windows 11（依赖 `Shell.Application` 枚举资源管理器窗口 / 标签页）
-- Python 3.13，使用 conda 环境 `D:\usr\miniconda3`
-- `pywin32`：`pip install pywin32`
+- Python 3.13，使用独立 conda 环境 `sks-win-explorer-tab`
+- 依赖见 `requirements.txt`：`pip install -r requirements.txt`
+  - `pywin32`：枚举资源管理器窗口 / 标签页
+  - `pystray` + `pillow`：关闭时最小化到系统托盘
 - 可选：ExplorerTabUtility —— 想要「新窗口并入已有窗口成为标签页」的效果时需要
 
 `run.bat` / `build.bat` 里是**直接写 conda 环境 `python.exe` 的绝对路径**来调用的：
 
 ```bat
-D:\usr\miniconda3\python.exe "%~dp0main.py"
+E:\devwork\miniconda_tmp\envs\sks-win-explorer-tab\python.exe "%~dp0main.py"
 ```
 
-这样保证用的是该环境里装的包（`pywin32` 就装在这里）。
-conda 装在别的位置时，把两个脚本里出现的这几处路径一起改掉。
+这样保证用的是该环境里装的包。
+环境建在别的位置时，把两个脚本里的 `PY` / `python.exe` 路径一起改掉。
 
 ## 目录结构
 
@@ -75,6 +86,8 @@ sks-win-explorer-tab/
 ├─ explorer.py    枚举资源管理器窗口/标签页、打开路径、ETU 进程检测与启动
 ├─ store.py       数据持久化（标签页组、收藏夹、设置）
 ├─ config.py      程序配置读写（config.json）
+├─ tray.py        系统托盘图标（pystray 封装）
+├─ requirements.txt 运行依赖清单
 ├─ run.bat        源码方式启动（带控制台，方便看报错）
 ├─ build.bat      打包脚本，产物输出到 target/
 ├─ target/        打包输出目录（内容已被 git 忽略）
@@ -89,7 +102,7 @@ sks-win-explorer-tab/
 双击 `run.bat`，或：
 
 ```bat
-D:\usr\miniconda3\python.exe main.py
+E:\devwork\miniconda_tmp\envs\sks-win-explorer-tab\python.exe main.py
 ```
 
 `run.bat` 默认带控制台启动（能看到报错）。确认无误后想去掉黑窗，
@@ -118,7 +131,8 @@ target/sks-win-explorer-tab.exe
 ```json
 {
   "etu_path": "D:\\usr\\ExplorerTabUtility\\ExplorerTabUtility.exe",
-  "show_full_path": false
+  "show_full_path": false,
+  "close_action": "tray"
 }
 ```
 
@@ -126,6 +140,7 @@ target/sks-win-explorer-tab.exe
 | --- | --- |
 | `etu_path` | ExplorerTabUtility 可执行文件路径 |
 | `show_full_path` | 收藏夹是否显示全路径（对应界面上「显示全路径」勾选框） |
+| `close_action` | 关闭窗口时的行为：`tray` 最小化到托盘，`exit` 直接退出 |
 
 - 文件不存在或内容损坏时，自动使用默认值
 - 也可以在界面上操作（`路径…` 选 ETU、勾选 `显示全路径`），改动立即写入该文件
@@ -162,4 +177,6 @@ ETU 常驻后会监听新打开的资源管理器窗口，把它们并入已有�
 
 - **`刷新状态` 显示未运行，但 ETU 确实开着**：确认 `~/.sks/sks-win-explorer-tab/config.json` 里的 `etu_path` 指向正在运行的那个 exe —— 进程名是按该路径的文件名匹配的。
 - **恢复标签页组时全开成了独立窗口**：ETU 没在运行，或者顶部勾选框没勾上。
+- **关闭窗口后程序没退出**：`config.json` 里 `close_action` 是 `tray`，属于预期行为。点托盘图标右键 `退出`，或取消顶部 `关闭时最小化到托盘` 勾选。
+- **勾了「关闭时最小化到托盘」却直接退出了**：环境里缺 `pystray` / `pillow`，会弹提示并回退为直接关闭，装上即可。
 - **`run.bat` / `build.bat` 报「is not recognized」之类的乱码错误**：脚本必须是 UTF-8 无 BOM + CRLF 换行，改动时注意别存成 LF。

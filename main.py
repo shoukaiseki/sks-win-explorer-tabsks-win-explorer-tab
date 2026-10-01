@@ -6,6 +6,7 @@
 右侧：已保存的标签页组（OneTab 风格），支持重命名、一键恢复、删除
 """
 import os
+import queue
 import threading
 import time
 import tkinter as tk
@@ -14,6 +15,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 import config
 import explorer
 import store
+import tray
 
 BG = "#f4f5f7"
 BAR_BG = "#ffffff"
@@ -108,6 +110,9 @@ class App:
         self.org_win = None            # 收藏夹整理窗口
         self.org_tree = None
         self.org_nodes = {}            # treeview iid -> 节点，根目录的 iid 对应 None
+        self.tray = None               # 托盘图标（按需启动）
+        self._tray_queue = queue.Queue()
+        self._tray_polling = False
 
         root.title("资源管理器标签页快照")
         root.configure(bg=BG)
@@ -115,6 +120,7 @@ class App:
         root.update_idletasks()
         root.state("zoomed")
         root.bind("<F5>", lambda _e: self.refresh_windows())
+        root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self._build()
         self.refresh_windows()
@@ -159,6 +165,14 @@ class App:
                        activebackground=BAR_BG, activeforeground=TEXT,
                        selectcolor=BAR_BG, bd=0, highlightthickness=0,
                        cursor="hand2").pack(side="right", padx=(0, 20))
+
+        self.close_to_tray = tk.BooleanVar(
+            value=self.cfg.get("close_action", "tray") == "tray")
+        tk.Checkbutton(bar, text="关闭时最小化到托盘", variable=self.close_to_tray,
+                       command=self.on_toggle_close_action, bg=BAR_BG, fg=TEXT,
+                       font=(FONT, 9), activebackground=BAR_BG, activeforeground=TEXT,
+                       selectcolor=BAR_BG, bd=0, highlightthickness=0,
+                       cursor="hand2").pack(side="right", padx=(0, 14))
 
     def _build_favorites_bar(self):
         bar = tk.Frame(self.root, bg=BAR_BG, height=46)
@@ -724,6 +738,78 @@ class App:
 
     def _after_restore(self):
         self.refresh_windows()
+
+    # ---------- 关闭行为 / 系统托盘 ----------
+
+    def on_toggle_close_action(self):
+        self.cfg["close_action"] = "tray" if self.close_to_tray.get() else "exit"
+        self._save_cfg()
+        if self.cfg["close_action"] == "exit" and self.tray is not None:
+            self.tray.stop()
+            self.tray = None
+
+    def on_close(self):
+        """点窗口右上角关闭：按设置最小化到托盘或直接退出。"""
+        if self.cfg.get("close_action") == "tray" and self.hide_to_tray():
+            return
+        self.quit_app()
+
+    def hide_to_tray(self):
+        """隐藏主窗口并确保托盘在跑；托盘不可用时返回 False。"""
+        if not tray.available():
+            messagebox.showwarning(
+                "系统托盘不可用",
+                "未检测到 pystray / Pillow，无法最小化到托盘。\n"
+                "安装后可启用该功能：\n"
+                "pip install pystray pillow\n\n本次将直接关闭程序。",
+                parent=self.root)
+            return False
+        if self.tray is None:
+            self.tray = tray.Tray(
+                on_show=lambda: self._tray_queue.put("show"),
+                on_exit=lambda: self._tray_queue.put("exit"))
+            if not self.tray.start():
+                self.tray = None
+                messagebox.showwarning("系统托盘不可用",
+                                       "托盘图标启动失败，本次将直接关闭程序。",
+                                       parent=self.root)
+                return False
+            self._start_tray_poller()
+        self.root.withdraw()
+        return True
+
+    def show_window(self):
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+
+    def quit_app(self):
+        if self.tray is not None:
+            self.tray.stop()
+            self.tray = None
+        self.root.destroy()
+
+    def _start_tray_poller(self):
+        """托盘回调发生在后台线程，这里在主线程轮询队列取结果。"""
+        if self._tray_polling:
+            return
+        self._tray_polling = True
+        self.root.after(250, self._poll_tray)
+
+    def _poll_tray(self):
+        if self.tray is None:
+            self._tray_polling = False
+            return
+        try:
+            while True:
+                action = self._tray_queue.get_nowait()
+                if action == "exit":
+                    self.quit_app()
+                    return
+                self.show_window()
+        except queue.Empty:
+            pass
+        self.root.after(250, self._poll_tray)
 
     # ---------- 打开路径 / ETU ----------
 

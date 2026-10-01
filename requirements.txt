@@ -1,0 +1,16 @@
+# sks-win-explorer-tab 运行依赖
+#
+# 安装：
+#   pip install -r requirements.txt
+#
+# 版本按当前验证通过的组合锁定：
+#   pywin32   枚举资源管理器窗口 / 标签页（Shell.Application）
+#   pystray   系统托盘图标
+#   pillow    pystray 绘制托盘图标所需
+
+pywin32==312
+pystray==0.19.5
+pillow==12.3.0
+
+# 打包依赖（仅 build.bat 使用，源码方式运行可以不装）
+# pyinstaller==6.22.3

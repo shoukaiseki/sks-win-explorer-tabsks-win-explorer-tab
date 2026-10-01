@@ -10,7 +10,13 @@ from store import DATA_DIR
 
 DEFAULT_ETU_PATH = r"D:\usr\ExplorerTabUtility\ExplorerTabUtility.exe"
 
-DEFAULTS = {"etu_path": DEFAULT_ETU_PATH, "show_full_path": False}
+CLOSE_ACTIONS = ("tray", "exit")
+
+DEFAULTS = {
+    "etu_path": DEFAULT_ETU_PATH,
+    "show_full_path": False,
+    "close_action": "tray",
+}
 
 
 def config_file():
@@ -30,6 +36,8 @@ def load():
     if not isinstance(path, str) or not path.strip():
         data["etu_path"] = DEFAULT_ETU_PATH
     data["show_full_path"] = bool(data.get("show_full_path", False))
+    if data.get("close_action") not in CLOSE_ACTIONS:
+        data["close_action"] = "tray"
     return data
 
 
